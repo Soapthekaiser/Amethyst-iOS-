@@ -501,9 +501,29 @@ JNIEXPORT jstring JNICALL Java_org_lwjgl_glfw_CallbackBridge_nativeClipboard(JNI
 JNIEXPORT void JNICALL Java_org_lwjgl_glfw_CallbackBridge_nativeSetGrabbing(JNIEnv* env, jclass clazz, jboolean grabbing, jfloat xset, jfloat yset) {
     isGrabbing = grabbing;
     
-    if(grabbing) {
+    if (grabbing) {
         [MinecraftOptionUtils.sharedInstance updateMCGuiScale];
     }
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        SurfaceViewController *vc = ((SurfaceViewController *)UIWindow.mainWindow.rootViewController);
+        [vc updateGrabState];
+    });
+}
+
+JNIEXPORT jlong JNICALL Java_org_lwjgl_glfw_CallbackBridge_nativeGetCocoaView(
+    JNIEnv* env,
+    jclass clazz,
+    jlong window
+) {
+    GameSurfaceView *surface = [SurfaceViewController surface];
+
+    if (surface == nil) {
+        return (jlong)0;
+    }
+
+    return (jlong)(__bridge void *)surface;
+}
 
     dispatch_async(dispatch_get_main_queue(), ^{
         SurfaceViewController *vc = ((SurfaceViewController *)UIWindow.mainWindow.rootViewController);
