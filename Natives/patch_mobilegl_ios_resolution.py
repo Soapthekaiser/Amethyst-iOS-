@@ -1,76 +1,86 @@
+```python
 #!/usr/bin/env python3
 
 import sys
 from pathlib import Path
 
-TARGET_FILE = "MobileGL/MG_Backend/DirectVulkan/BackendObject_DirectVulkan.cpp"
+TARGET_FILE = "MobileGL/MG_Backend/DirectVulkan/Renderer/VulkanRenderer.cpp"
 
-OLD_INCLUDE_BLOCK = """#include <Config.h>
-#include <cmath>
-#include <cstdlib>
-#include <cstring>"""
-
-NEW_INCLUDE_BLOCK = """#include <Config.h>
-#include <cmath>
-#include <cstdlib>
-#include <cstring>
-
-#if defined(__APPLE__)
-#include <CoreGraphics/CoreGraphics.h>
-#include <objc/message.h>
-#include <objc/runtime.h>
-#endif"""
-
-OLD_BLOCK = """    Bool BackendObject_DirectVulkan::SwapEGLBuffers(EGLDisplay dpy, EGLSurface draw) {
-        const std::lock_guard<std::recursive_mutex> lock(m_eglStateMutex);
-        if (!pVulkanRenderer) {
-            MGLOG_E("DirectVulkan renderer is not initialized");
-            return false;
+OLD_BLOCK = """        VkImageBlit blitRegion{};
+        blitRegion.srcSubresource.aspectMask = srcBinding.aspectMask;
+        blitRegion.srcSubresource.mipLevel = srcBinding.mipLevel;
+        blitRegion.srcSubresource.baseArrayLayer = srcBinding.baseArrayLayer;
+        blitRegion.srcSubresource.layerCount = srcBinding.layerCount;
+        blitRegion.srcOffsets[0] = {srcX0, srcY0, 0};
+        blitRegion.srcOffsets[1] = {srcX1, srcY1, 1};
+        blitRegion.dstSubresource.aspectMask = dstBinding.aspectMask;
+        blitRegion.dstSubresource.mipLevel = dstBinding.mipLevel;
+        blitRegion.dstSubresource.baseArrayLayer = dstBinding.baseArrayLayer;
+        blitRegion.dstSubresource.layerCount = dstBinding.layerCount;
+        blitRegion.dstOffsets[0] = {dstX0, dstY0, 0};
+        blitRegion.dstOffsets[1] = {dstX1, dstY1, 1};
+        if (readIsDefaultFbo) {
+            ApplyNativeBlitDefaultFramebufferSourceTransform(m_swapchainObject.GetPreTransform(), srcBinding,
+                                                             blitRegion);
         }
-        return BackendObject::SwapEGLBuffers(dpy, draw);
-    }"""
+        if (drawIsDefaultFbo) {
+            ApplyNativeBlitDefaultFramebufferTransform(m_swapchainObject.GetPreTransform(), dstBinding, blitRegion);
+        }"""
 
-NEW_BLOCK = """    Bool BackendObject_DirectVulkan::SwapEGLBuffers(EGLDisplay dpy, EGLSurface draw) {
-        const std::lock_guard<std::recursive_mutex> lock(m_eglStateMutex);
-        if (!pVulkanRenderer) {
-            MGLOG_E("DirectVulkan renderer is not initialized");
-            return false;
-        }
+NEW_BLOCK = """        // Minecraft's resolution slider renders into a smaller framebuffer but still
+        // blits that framebuffer into the default framebuffer. When the resolution is
+        // below 100%, the GL destination rectangle can therefore be the same size as
+        // the reduced source rectangle instead of covering the whole swapchain.
+        //
+        // For a fullscreen color blit into the default framebuffer, expand the destination
+        // rectangle to the complete swapchain extent. This lets vkCmdBlitImage perform the
+        // required scaling rather than copying the reduced framebuffer into only part of
+        // the presentation image.
+        if (drawIsDefaultFbo) {
+            const Int requestedSrcWidth = std::abs(srcX1 - srcX0);
+            const Int requestedSrcHeight = std::abs(srcY1 - srcY0);
+            const Int requestedDstWidth = std::abs(dstX1 - dstX0);
+            const Int requestedDstHeight = std::abs(dstY1 - dstY0);
 
-#if defined(__APPLE__)
-        // On iOS, Minecraft's resolution slider changes the CAMetalLayer drawableSize.
-        // The EGL window surface itself remains valid; only its pixel backing size changes.
-        // Keep the EGL surface/context alive and update MobileGL's active surface size in place
-        // so DirectVulkan recreates the swapchain on the next Present().
-        if (m_windowHandle.Backend == WindowBackend::MetalLayer &&
-            m_windowHandle.Handle != nullptr &&
-            m_eglSurface == draw) {
-            using SendCGSizeFn = CGSize (*)(id, SEL);
-            auto* layer = reinterpret_cast<id>(m_windowHandle.Handle);
-            const CGSize drawableSize =
-                reinterpret_cast<SendCGSizeFn>(objc_msgSend)(layer, sel_registerName("drawableSize"));
+            const Uint32 framebufferWidth = dstBinding.extent.x();
+            const Uint32 framebufferHeight = dstBinding.extent.y();
 
-            const Uint32 width = drawableSize.width > 0.0
-                ? static_cast<Uint32>(std::lround(drawableSize.width))
-                : 0;
-            const Uint32 height = drawableSize.height > 0.0
-                ? static_cast<Uint32>(std::lround(drawableSize.height))
-                : 0;
+            const Bool isFullscreenScaledBlit =
+                requestedSrcWidth > 0 &&
+                requestedSrcHeight > 0 &&
+                requestedDstWidth == requestedSrcWidth &&
+                requestedDstHeight == requestedSrcHeight &&
+                (requestedDstWidth != static_cast<Int>(framebufferWidth) ||
+                 requestedDstHeight != static_cast<Int>(framebufferHeight));
 
-            if (width > 0 && height > 0 &&
-                (m_windowHandle.Width != width || m_windowHandle.Height != height)) {
-                if (!BackendObject::ResizeEGLWindowSurface(draw, width, height)) {
-                    MGLOG_W("DirectVulkan: failed to update EGL window surface size to %ux%u",
-                            width, height);
-                } else {
-                    pVulkanRenderer->RequestSwapchainResize(width, height);
-                }
+            if (isFullscreenScaledBlit) {
+                dstX0 = 0;
+                dstY0 = 0;
+                dstX1 = static_cast<GLint>(framebufferWidth);
+                dstY1 = static_cast<GLint>(framebufferHeight);
             }
         }
-#endif
 
-        return BackendObject::SwapEGLBuffers(dpy, draw);
-    }"""
+        VkImageBlit blitRegion{};
+        blitRegion.srcSubresource.aspectMask = srcBinding.aspectMask;
+        blitRegion.srcSubresource.mipLevel = srcBinding.mipLevel;
+        blitRegion.srcSubresource.baseArrayLayer = srcBinding.baseArrayLayer;
+        blitRegion.srcSubresource.layerCount = srcBinding.layerCount;
+        blitRegion.srcOffsets[0] = {srcX0, srcY0, 0};
+        blitRegion.srcOffsets[1] = {srcX1, srcY1, 1};
+        blitRegion.dstSubresource.aspectMask = dstBinding.aspectMask;
+        blitRegion.dstSubresource.mipLevel = dstBinding.mipLevel;
+        blitRegion.dstSubresource.baseArrayLayer = dstBinding.baseArrayLayer;
+        blitRegion.dstSubresource.layerCount = dstBinding.layerCount;
+        blitRegion.dstOffsets[0] = {dstX0, dstY0, 0};
+        blitRegion.dstOffsets[1] = {dstX1, dstY1, 1};
+        if (readIsDefaultFbo) {
+            ApplyNativeBlitDefaultFramebufferSourceTransform(m_swapchainObject.GetPreTransform(), srcBinding,
+                                                             blitRegion);
+        }
+        if (drawIsDefaultFbo) {
+            ApplyNativeBlitDefaultFramebufferTransform(m_swapchainObject.GetPreTransform(), dstBinding, blitRegion);
+        }"""
 
 def main():
     if len(sys.argv) != 2:
@@ -80,7 +90,7 @@ def main():
     root = Path(sys.argv[1]).resolve()
     target = root / TARGET_FILE
 
-    print(f"[Amethyst] Patching MobileGL iOS resolution handling: {target}")
+    print(f"[Amethyst] Patching MobileGL iOS resolution scaling: {target}")
 
     if not target.is_file():
         print(f"Error: Couldn't find {target}", file=sys.stderr)
@@ -88,26 +98,23 @@ def main():
 
     content = target.read_text(encoding="utf-8")
 
-    if "DirectVulkan: failed to update EGL window surface size" in content:
-        print("MobileGL iOS resolution patch already applied, skipping.")
+    if "isFullscreenScaledBlit" in content:
+        print("MobileGL iOS resolution scaling patch already applied, skipping.")
         return 0
 
-    if OLD_INCLUDE_BLOCK not in content:
-        print("Error: MobileGL DirectVulkan include block not found.", file=sys.stderr)
-        return 1
-
     if OLD_BLOCK not in content:
-        print("Error: DirectVulkan SwapEGLBuffers block not found.", file=sys.stderr)
+        print("Error: Expected MobileGL color blit block not found.", file=sys.stderr)
+        print("The MobileGL revision does not match the source this patch targets.", file=sys.stderr)
         return 1
 
-    content = content.replace(OLD_INCLUDE_BLOCK, NEW_INCLUDE_BLOCK, 1)
-    content = content.replace(OLD_BLOCK, NEW_BLOCK, 1)
+    patched_content = content.replace(OLD_BLOCK, NEW_BLOCK, 1)
 
-    target.write_text(content, encoding="utf-8")
+    target.write_text(patched_content, encoding="utf-8")
 
-    print("Successfully patched MobileGL iOS resolution handling.")
+    print("Successfully patched MobileGL iOS resolution scaling.")
     return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+```
