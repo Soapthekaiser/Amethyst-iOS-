@@ -331,16 +331,15 @@ dep_mobilegl:
 		echo 'MobileGL source directory not found: $(MOBILEGL_SOURCE_DIR)'; \
 		exit 1; \
 	fi
-
 	if [ -d "$(MOBILEGL_SOURCE_DIR)/3rdparty/glslang" ]; then \
 		cd $(MOBILEGL_SOURCE_DIR)/3rdparty/glslang && python3 update_glslang_sources.py; \
 	fi
 	mkdir -p $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Compat
 	cp $(SOURCEDIR)/Natives/libcxx_hash_shim.cpp $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Compat/libcxx_hash_shim.cpp
 	python3 $(SOURCEDIR)/Natives/patch_mobilegl_ios_visibility.py $(MOBILEGL_SOURCE_DIR)
+	python3 $(SOURCEDIR)/Natives/patch_mobilegl_ios_resolution.py $(MOBILEGL_SOURCE_DIR)
 	python3 $(SOURCEDIR)/Natives/patch_mobilegl_hash_shim.py $(MOBILEGL_SOURCE_DIR)
 	python3 $(SOURCEDIR)/Natives/patch_mobilegl_enable_availability.py $(MOBILEGL_SOURCE_DIR)
-	python3 $(SOURCEDIR)/Natives/patch_mobilegl.py $(MOBILEGL_SOURCE_DIR)
 	mkdir -p $(WORKINGDIR)/mobilegl
 	cd $(WORKINGDIR)/mobilegl && cmake \
 		-DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) \
