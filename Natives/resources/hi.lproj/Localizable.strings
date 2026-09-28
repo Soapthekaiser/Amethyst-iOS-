@@ -1,3 +1,7 @@
 "game.menu.log_output" = "लॉग आउटपुट";
 "custom_controls.control_menu.exit" = "बाहर जाएं";
 "login.option.select" = "एकाउंट का चयन करें ";
+
+"preference.title.renderer.release.mg" = "मोबाइलग्लूज़";
+"preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - OpenGL 4.0 निर्यात करता है,";
+"preference.title.renderer.debug.mobilegl" = "मोबाइलजीएल वल्कन (1.17+) - ओपनजीएल 4.6, प्रायोगिक निर्यात करता है";

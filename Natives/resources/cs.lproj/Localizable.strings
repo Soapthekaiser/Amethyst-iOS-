@@ -170,7 +170,7 @@
 "preference.title.renderer.debug.auto" = "Automaticky: gl4es či ANGLE";
 "preference.title.renderer.debug.gl4es" = "gl4es 1.1.4 - exportuje OpenGL 2.1";
 "preference.title.renderer.debug.angle" = "ANGLE (1.17+) - exportuje OpenGL 3.2 (Jádrový Profil, omezen)";
-"preference.title.renderer.debug.zink" = "Zink (Mesa 21.0) - exportuje OpenGL 4.1";
+"preference.title.renderer.debug.zink" = "Zink (Mesa 25.0) - exportuje OpenGL 4.1";
 
 "preference.detail.renderer" = "Změnit OpenGL vykreslovací systém k užívání";
 
@@ -284,3 +284,7 @@
 "controller_configurator.section.footer.menu_mappings" = "Mapování při odemčené myši, například na titulní obrazovce či v nabídce pozastavení.";
 "controller_configurator.section.controller_style" = "Typ ovladače";
 "controller_configurator.section.footer.controller_style" = "Ukázat odlišné názvy tlačítek ovladače v tomto nastavení.";
+
+"preference.title.renderer.release.mg" = "Mobilní lepidla";
+"preference.title.renderer.debug.mg" = "MobileGlues (1.17+) – exportuje OpenGL 4.0,";
+"preference.title.renderer.debug.mobilegl" = "MobileGL Vulkan (1.17+) - exportuje OpenGL 4.6, EXPERIMENTÁLNÍ";

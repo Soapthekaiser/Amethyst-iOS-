@@ -170,7 +170,7 @@
 "preference.title.renderer.debug.auto" = "自动：gl4es 或 ANGLE";
 "preference.title.renderer.debug.gl4es" = "gl4es 1.1.4 - OpenGL版本2.1";
 "preference.title.renderer.debug.angle" = "ANGLE（仅支持1.17+）- exports OpenGL 版本 3.2";
-"preference.title.renderer.debug.zink" = "Zink（Mesa 21.0）- exports OpenGL 版本 4.1";
+"preference.title.renderer.debug.zink" = "Zink（Mesa 25.0）- exports OpenGL 版本 4.1";
 
 "preference.detail.renderer" = "更改使用的 OpenGL 渲染器";
 
@@ -284,3 +284,7 @@
 "controller_configurator.section.footer.menu_mappings" = "当鼠标未被锁定时，如在标题屏幕或暂停菜单中时绑定。";
 "controller_configurator.section.controller_style" = "手柄类型";
 "controller_configurator.section.footer.controller_style" = "在此配置器中显示不同的手柄按钮名称。";
+
+"preference.title.renderer.release.mg" = "移动胶水";
+"preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - 导出 OpenGL 4.0，";
+"preference.title.renderer.debug.mobilegl" = "MobileGL Vulkan (1.17+) - 导出 OpenGL 4.6，实验性";

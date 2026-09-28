@@ -41,3 +41,7 @@
 "preference.title.auto_ram" = "Аутпматски RAM";
 "preference.detail.auto_ram" = "Укључије аутомстски подешавање RAM-а";
 "preference.detail.allocated_memory" = "Колико меморије може да корости Minecraft";
+
+"preference.title.renderer.release.mg" = "МобилеГлуес";
+"preference.title.renderer.debug.mg" = "МобилеГлуес (1.17+) - извози ОпенГЛ 4.0,";
+"preference.title.renderer.debug.mobilegl" = "МобилеГЛ Вулкан (1.17+) - извози ОпенГЛ 4.6, ЕКСПЕРИМЕНТАЛНО";

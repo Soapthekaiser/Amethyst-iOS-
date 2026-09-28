@@ -139,7 +139,7 @@
 
 "preference.title.renderer.debug.auto" = "خودکار: gl4es یا ANGLE";
 "preference.title.renderer.debug.angle" = "ANGLE (1.17+) - OpenGL 3.2 را صادر می کند (نمایه هسته، محدود)";
-"preference.title.renderer.debug.zink" = "Zink (Mesa 21.0) - OpenGL 4.1 را صادر می کند";
+"preference.title.renderer.debug.zink" = "Zink (Mesa 25.0) - OpenGL 4.1 را صادر می کند";
 
 "preference.title.resolution" = "وضوح (%)";
 "preference.detail.resolution" = "به شما امکان می دهد وضوح بازی را کاهش دهید.";
@@ -187,3 +187,7 @@
 "preference.title.debug_show_layout_overlap" = "نمایش همپوشانی طرح";
 "preference.detail.debug_show_layout_overlap" = "هر نما را با یک رنگ شفاف پوشش دهید تا نماهای همپوشانی نشان داده شود.";
 "controller_configurator.playstation.title.named_back" = "انتخاب";
+
+"preference.title.renderer.release.mg" = "چسب موبایل";
+"preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - OpenGL 4.0 را صادر می کند،";
+"preference.title.renderer.debug.mobilegl" = "MobileGL Vulkan (1.17+) - OpenGL 4.6، EXPERIMENTAL را صادر می کند";

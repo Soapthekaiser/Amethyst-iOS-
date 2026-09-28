@@ -3,3 +3,7 @@
 "custom_controls.control_menu.save" = "Tallenna";
 "login.option.select" = "Valitse tili";
 "Settings" = "Asetukset";
+
+"preference.title.renderer.release.mg" = "Mobiililiimat";
+"preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - vie OpenGL 4.0:n,";
+"preference.title.renderer.debug.mobilegl" = "MobileGL Vulkan (1.17+) - vie OpenGL 4.6, KOKEELLINEN";

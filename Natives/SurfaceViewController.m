@@ -116,7 +116,7 @@ static GameSurfaceView* pojavWindow;
     [self performSelector:@selector(initCategory_Navigation)];
     
     self.surfaceView = [[GameSurfaceView alloc] initWithFrame:self.view.frame];
-    self.surfaceView.layer.contentsScale = screenScale * resolutionScale;
+    self.surfaceView.layer.contentsScale = screenScale;
     self.surfaceView.layer.magnificationFilter = self.surfaceView.layer.minificationFilter = kCAFilterNearest;
     self.surfaceView.multipleTouchEnabled = YES;
     pojavWindow = self.surfaceView;
@@ -374,19 +374,29 @@ static GameSurfaceView* pojavWindow;
     }
 
     resolutionScale = getPrefFloat(@"video.resolution") / 100.0;
-    self.surfaceView.layer.contentsScale = self.screenScale * resolutionScale;
+    self.surfaceView.layer.contentsScale = self.screenScale;
 
     physicalWidth = roundf(self.surfaceView.frame.size.width * self.screenScale);
     physicalHeight = roundf(self.surfaceView.frame.size.height * self.screenScale);
+
+    // Minecraft's internal render resolution.
     windowWidth = roundf(physicalWidth * resolutionScale);
     windowHeight = roundf(physicalHeight * resolutionScale);
-    // Resolution should not be odd
+
+    // Resolution should not be odd.
     if ((windowWidth % 2) != 0) {
         --windowWidth;
     }
     if ((windowHeight % 2) != 0) {
         --windowHeight;
     }
+
+    if ([self.surfaceView.layer isKindOfClass:CAMetalLayer.class]) {
+        ((CAMetalLayer *)self.surfaceView.layer).drawableSize =
+            CGSizeMake(MAX(windowWidth, 1), MAX(windowHeight, 1));
+    }
+
+    // Tell Minecraft/MobileGL about the internal render resolution.
     CallbackBridge_nativeSendScreenSize(windowWidth, windowHeight);
 }
 
@@ -411,7 +421,7 @@ static GameSurfaceView* pojavWindow;
 - (void)updateGrabState {
     // Update cursor position
     if (isGrabbing == JNI_TRUE) {
-        CGFloat screenScale = self.surfaceView.layer.contentsScale;
+        CGFloat screenScale = self.screenScale;
         CallbackBridge_nativeSendCursorPos(ACTION_DOWN, lastVirtualMousePoint.x * screenScale, lastVirtualMousePoint.y * screenScale);
         virtualMouseFrame.origin.x = self.view.frame.size.width / 2;
         virtualMouseFrame.origin.y = self.view.frame.size.height / 2;

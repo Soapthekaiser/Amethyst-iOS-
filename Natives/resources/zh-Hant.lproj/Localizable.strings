@@ -141,7 +141,7 @@
 "preference.title.renderer.debug.auto" = "自動：gl4es或ANGLE";
 "preference.title.renderer.debug.gl4es" = "gl4es 1.1.4 － 輸出OpenGL 2.1";
 "preference.title.renderer.debug.angle" = "ANGLE（1.17+）— 輸出OpenGL 3.2（核心，有限）";
-"preference.title.renderer.debug.zink" = "Zink (Mesa 21.0) － 輸出OpenGL 4.1";
+"preference.title.renderer.debug.zink" = "Zink (Mesa 25.0) － 輸出OpenGL 4.1";
 
 "preference.detail.renderer" = "改變要使用的OpenGL渲染引擎";
 
@@ -191,3 +191,7 @@
 "preference.title.debug_show_layout_overlap" = "顯示重複的佈局";
 "preference.detail.debug_show_layout_overlap" = "通過用透明顏色來覆蓋所有視圖，來顯示重複的視圖";
 "controller_configurator.playstation.title.named_back" = "選擇";
+
+"preference.title.renderer.release.mg" = "移動膠水";
+"preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - 匯出 OpenGL 4.0，";
+"preference.title.renderer.debug.mobilegl" = "MobileGL Vulkan (1.17+) - 匯出 OpenGL 4.6，實驗性";

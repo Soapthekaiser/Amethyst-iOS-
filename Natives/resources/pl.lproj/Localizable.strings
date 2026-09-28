@@ -132,7 +132,7 @@
 
 "preference.title.renderer" = "Silnik renderujący";
 "preference.title.renderer.debug.gl4es" = "gl4es 1.1.4 - eksportuje OpenGL 2.1";
-"preference.title.renderer.debug.zink" = "Zink (Mesa 21.0) - eksportuje OpenGL 4.1";
+"preference.title.renderer.debug.zink" = "Zink (Mesa 25.0) - eksportuje OpenGL 4.1";
 
 "preference.detail.renderer" = "Zmień używany silnik renderujący OpenGL";
 
@@ -177,3 +177,7 @@
 "preference.title.debug_show_layout_overlap" = "Pokaż nakładające się układy";
 "preference.detail.debug_show_layout_overlap" = "Nakładaj każdy widok przezroczystym kolorem, aby odsłonić nakładające się widoki.";
 "controller_configurator.playstation.title.named_back" = "Wybierz";
+
+"preference.title.renderer.release.mg" = "Kleje mobilne";
+"preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - eksportuje OpenGL 4.0,";
+"preference.title.renderer.debug.mobilegl" = "MobileGL Vulkan (1.17+) - eksportuje OpenGL 4.6, EKSPERYMENTALNY";

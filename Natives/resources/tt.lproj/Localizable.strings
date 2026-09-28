@@ -69,3 +69,7 @@
 "preference.title.java_args" = "JVM кушу аргументлары";
 "preference.title.auto_ram" = "Автоматик тиз хәтер билгеләү";
 "controller_configurator.playstation.title.named_back" = "Сайлау";
+
+"preference.title.renderer.release.mg" = "MobileGlues";
+"preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - OpenGL 4.0 экспортлый,";
+"preference.title.renderer.debug.mobilegl" = "MobileGL Вулкан (1.17+) - OpenGL 4.6 экспортлый, ТӘPРИБӘ";

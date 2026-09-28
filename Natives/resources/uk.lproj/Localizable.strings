@@ -168,7 +168,7 @@
 "preference.title.renderer.debug.auto" = "Авто: gl4 або ANGLE";
 "preference.title.renderer.debug.gl4es" = "Gl4es 1.1.4 - експортує OpenGL 2.1";
 "preference.title.renderer.debug.angle" = "ANGLE (1.17+) - експортує OpenGL 3.2 (Базовий профіль, обмежений)";
-"preference.title.renderer.debug.zink" = "Zink (Mesa 21.0) - експортує OpenGL 4.1";
+"preference.title.renderer.debug.zink" = "Zink (Mesa 25.0) - експортує OpenGL 4.1";
 
 "preference.detail.renderer" = "Зміни двигун візуалізації OpenGL для використання";
 
@@ -260,3 +260,7 @@
 "controller_configurator.playstation.title.thumb_left" = "L3";
 "controller_configurator.playstation.title.thumb_right" = "R3";
 "controller_configurator.section.controller_style" = "Тип контролера";
+
+"preference.title.renderer.release.mg" = "MobileGlues";
+"preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - експортує OpenGL 4.0,";
+"preference.title.renderer.debug.mobilegl" = "MobileGL Vulkan (1.17+) - експортує OpenGL 4.6, ЕКСПЕРИМЕНТАЛЬНИЙ";

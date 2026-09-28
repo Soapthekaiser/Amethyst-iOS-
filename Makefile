@@ -9,7 +9,7 @@ OUTPUTDIR   := $(SOURCEDIR)/artifacts
 WORKINGDIR  := $(SOURCEDIR)/Natives/build
 DETECTPLAT  := $(shell uname -s)
 DETECTARCH  := $(shell uname -m)
-VERSION     := 1.0
+VERSION     := 1.2.0
 BRANCH      := $(shell git branch --show-current)
 COMMIT      := $(shell git log --oneline | sed '2,10000000d' | cut -b 1-7)
 PLATFORM    ?= 2
@@ -109,6 +109,8 @@ POJAV_JRE8_DIR        ?= $(SOURCEDIR)/depends/java-8-openjdk
 POJAV_JRE17_DIR       ?= $(SOURCEDIR)/depends/java-17-openjdk
 POJAV_JRE21_DIR       ?= $(SOURCEDIR)/depends/java-21-openjdk
 POJAV_JRE25_DIR       ?= $(SOURCEDIR)/depends/java-25-openjdk
+MOBILEGL_SOURCE_DIR   ?= $(SOURCEDIR)/Natives/external/MobileGL
+MOLTENVK_LIBRARY      ?= $(SOURCEDIR)/Natives/resources/Frameworks/libMoltenVK.dylib
 
 # Function to use later for checking dependencies
 METHOD_DEPCHECK   = $(shell $(1) >/dev/null 2>&1 && echo 1)
@@ -317,12 +319,58 @@ dep_mg:
 		-DCMAKE_OSX_ARCHITECTURES=arm64 \
 		-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
 		-DCMAKE_C_FLAGS="-arch arm64" \
-		$(SOURCEDIR)/Natives/external/MobileGlues/src/main/cpp/
+		$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/
 
 	cmake --build $(WORKINGDIR)/mobileglues --config RelWithDebInfo -j$(JOBS) --target mobileglues
 	cp $(WORKINGDIR)/mobileglues/libmobileglues.dylib $(WORKINGDIR)/libmobileglues.dylib
-	cp $(SOURCEDIR)/Natives/external/MobileGlues/src/main/cpp/libraries/ios/libspirv-cross-c-shared.0.dylib $(WORKINGDIR)/libspirv-cross-c-shared.0.dylib
 	echo '[Amethyst v$(VERSION)] dep_mg - end'
+
+dep_mobilegl:
+	echo '[Amethyst v$(VERSION)] dep_mobilegl - start'
+	if [ ! -d "$(MOBILEGL_SOURCE_DIR)" ]; then \
+		echo 'MobileGL source directory not found: $(MOBILEGL_SOURCE_DIR)'; \
+		exit 1; \
+	fi
+
+	if [ -d "$(MOBILEGL_SOURCE_DIR)/3rdparty/glslang" ]; then \
+		cd $(MOBILEGL_SOURCE_DIR)/3rdparty/glslang && python3 update_glslang_sources.py; \
+	fi
+	mkdir -p $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Compat
+	cp $(SOURCEDIR)/Natives/libcxx_hash_shim.cpp $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Compat/libcxx_hash_shim.cpp
+	python3 $(SOURCEDIR)/Natives/patch_mobilegl_ios_visibility.py $(MOBILEGL_SOURCE_DIR)
+	python3 $(SOURCEDIR)/Natives/patch_mobilegl_hash_shim.py $(MOBILEGL_SOURCE_DIR)
+	python3 $(SOURCEDIR)/Natives/patch_mobilegl_enable_availability.py $(MOBILEGL_SOURCE_DIR)
+	python3 $(SOURCEDIR)/Natives/patch_mobilegl.py $(MOBILEGL_SOURCE_DIR)
+	mkdir -p $(WORKINGDIR)/mobilegl
+	cd $(WORKINGDIR)/mobilegl && cmake \
+		-DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) \
+		-DCMAKE_CROSSCOMPILING=true \
+		-DCMAKE_SYSTEM_NAME=Darwin \
+		-DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+		-DCMAKE_OSX_SYSROOT="$(SDKPATH)" \
+		-DCMAKE_OSX_ARCHITECTURES=arm64 \
+		-DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 \
+		-DCMAKE_C_FLAGS="-arch arm64" \
+		-DCMAKE_CXX_FLAGS="-arch arm64" \
+		-DMOBILEGL_IOS=ON \
+		-DMOBILEGL_BUILD_TEST=OFF \
+		-DMOBILEGL_BUILD_BENCHMARK=OFF \
+		-DMOBILEGL_BUILD_TRACE_REPLAY=OFF \
+		-DMOBILEGL_ENABLE_LTO=ON \
+		-DMOBILEGL_VULKAN_LIBRARY="$(MOLTENVK_LIBRARY)" \
+		$(MOBILEGL_SOURCE_DIR)
+
+	cmake --build $(WORKINGDIR)/mobilegl --config $(CMAKE_BUILD_TYPE) -j$(JOBS) --target MobileGL
+	install_name_tool -change @rpath/MoltenVK.framework/MoltenVK @rpath/libMoltenVK.dylib $(WORKINGDIR)/mobilegl/libMobileGL.dylib
+	if otool -l $(WORKINGDIR)/mobilegl/libMobileGL.dylib | grep -q 'path $(SOURCEDIR)/Natives/resources/Frameworks '; then \
+		install_name_tool -delete_rpath $(SOURCEDIR)/Natives/resources/Frameworks $(WORKINGDIR)/mobilegl/libMobileGL.dylib; \
+	fi
+	if otool -l $(WORKINGDIR)/mobilegl/libMobileGL.dylib | grep -q 'path @loader_path '; then \
+		install_name_tool -delete_rpath @loader_path $(WORKINGDIR)/mobilegl/libMobileGL.dylib; \
+	fi
+	install_name_tool -add_rpath @loader_path $(WORKINGDIR)/mobilegl/libMobileGL.dylib
+	cp $(WORKINGDIR)/mobilegl/libMobileGL.dylib $(WORKINGDIR)/libMobileGL.dylib
+	echo '[Amethyst v$(VERSION)] dep_mobilegl - end'
 
 assets:
 	echo '[Amethyst v$(VERSION)] assets - start'
@@ -339,16 +387,33 @@ assets:
 	fi
 	echo '[Amethyst v$(VERSION)] assets - end'
 
-payload: native dep_mg java jre assets
+payload: native dep_mg dep_mobilegl java jre assets
 	echo '[Amethyst v$(VERSION)] payload - start'
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs)
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs_caciocavallo)
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs_caciocavallo17)
 	cp -R $(SOURCEDIR)/Natives/resources/en.lproj/LaunchScreen.storyboardc $(WORKINGDIR)/AngelAuraAmethyst.app/Base.lproj/ || exit 1
-	cp -R $(SOURCEDIR)/Natives/resources/* $(WORKINGDIR)/AngelAuraAmethyst.app/ || exit 1
+	cp -R $(SOURCEDIR)/Natives/resources/* $(WORKINGDIR)/AngelAuraAmethyst.app/ || exit
+	if [ -d $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/lwjgl33 ]; then \
+		for f in $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/lwjgl33/*.dylib; do \
+			install_name_tool -id "@rpath/lwjgl33/$$(basename "$$f")" "$$f" || exit 1; \
+		done; \
+	fi
+	if [ -d $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/lwjgl34 ]; then \
+		for f in $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/lwjgl34/*.dylib; do \
+			install_name_tool -id "@rpath/lwjgl34/$$(basename "$$f")" "$$f" || exit 1; \
+		done; \
+	fi
 	cp $(WORKINGDIR)/*.dylib $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/ || exit 1
 	cp -R $(SOURCEDIR)/JavaApp/libs/others/* $(WORKINGDIR)/AngelAuraAmethyst.app/libs/ || exit 1
-	cp $(SOURCEDIR)/JavaApp/build/*.jar $(WORKINGDIR)/AngelAuraAmethyst.app/libs/ || exit 1
+	mkdir -p $(WORKINGDIR)/AngelAuraAmethyst.app/libs/lwjgl33 $(WORKINGDIR)/AngelAuraAmethyst.app/libs/lwjgl34
+	for f in $(SOURCEDIR)/JavaApp/build/*.jar; do \
+		case "$$(basename "$$f")" in \
+			lwjgl-3.3.3.jar) cp "$$f" $(WORKINGDIR)/AngelAuraAmethyst.app/libs/lwjgl33/ || exit 1 ;; \
+			lwjgl-3.4.1.jar) cp "$$f" $(WORKINGDIR)/AngelAuraAmethyst.app/libs/lwjgl34/ || exit 1 ;; \
+			*) cp "$$f" $(WORKINGDIR)/AngelAuraAmethyst.app/libs/ || exit 1 ;; \
+		esac; \
+	done
 	cp -R $(SOURCEDIR)/JavaApp/libs/caciocavallo/* $(WORKINGDIR)/AngelAuraAmethyst.app/libs_caciocavallo || exit 1
 	cp -R $(SOURCEDIR)/JavaApp/libs/caciocavallo17/* $(WORKINGDIR)/AngelAuraAmethyst.app/libs_caciocavallo17 || exit 1
 	$(call METHOD_DIRCHECK,$(OUTPUTDIR)/Payload)
@@ -379,7 +444,14 @@ deploy:
 		ldid -S$(SOURCEDIR)/entitlements.trollstore.xml $(WORKINGDIR)/AngelAuraAmethyst.app/AngelAuraAmethyst || exit 1; \
 		sudo mv $(WORKINGDIR)/*.dylib $(PREFIX)Applications/AngelAuraAmethyst.app/Frameworks/ || exit 1; \
 		sudo mv $(WORKINGDIR)/AngelAuraAmethyst.app/AngelAuraAmethyst $(PREFIX)Applications/AngelAuraAmethyst.app/AngelAuraAmethyst || exit 1; \
-		sudo mv $(SOURCEDIR)/JavaApp/build/*.jar $(PREFIX)Applications/AngelAuraAmethyst.app/libs/ || exit 1; \
+		sudo mkdir -p $(PREFIX)Applications/AngelAuraAmethyst.app/libs/lwjgl33 $(PREFIX)Applications/AngelAuraAmethyst.app/libs/lwjgl34 || exit 1; \
+		for f in $(SOURCEDIR)/JavaApp/build/*.jar; do \
+			case "$$(basename "$$f")" in \
+				lwjgl-3.3.3.jar) sudo mv "$$f" $(PREFIX)Applications/AngelAuraAmethyst.app/libs/lwjgl33/ || exit 1 ;; \
+				lwjgl-3.4.1.jar) sudo mv "$$f" $(PREFIX)Applications/AngelAuraAmethyst.app/libs/lwjgl34/ || exit 1 ;; \
+				*) sudo mv "$$f" $(PREFIX)Applications/AngelAuraAmethyst.app/libs/ || exit 1 ;; \
+			esac; \
+		done; \
 		cd $(PREFIX)Applications/AngelAuraAmethyst.app/Frameworks || exit 1; \
 		sudo chown -R 501:501 $(PREFIX)Applications/AngelAuraAmethyst.app/* || exit 1; \
 	elif [ '$(IOS)' = '0' ] && [ '$(DETECTPLAT)' = 'Darwin' ]; then \
@@ -401,8 +473,7 @@ deploy:
 package: payload
 	echo '[Amethyst v$(VERSION)] package - start'
 	if [ '$(TEAMID)' != '-1' ] && [ '$(SIGNING_TEAMID)' != '-1' ] && [ -f '$(PROVISIONING)' ] && [ '$(DETECTPLAT)' = 'Darwin' ]; then \
-		printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n	<key>application-identifier</key>\n	<string>$(TEAMID).org.angelauramc.amethyst</string>\n	<key>com.apple.developer.team-identifier</key>\n	<string>$(TEAMID)</string>\n	<key>get-task-allow</key>\n	<true/>\n	<key>keychain-access-groups</key>\n	<array>\n	<string>$(TEAMID).*</string>\n	<string>com.apple.token</string>\n	</array>\n</dict>\n</plist>' > entitlements.codesign.xml; \
-		$(MAKE) codesign; \
+		printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n	<key>application-identifier</key>\n	<string>$(TEAMID).org.angelauramc.amethyst</string>\n	<key>com.apple.developer.team-identifier</key>\n	<string>$(TEAMID)</string>\n	<key>get-task-allow</key>\n	<true/>\n	<key>keychain-access-groups</key>\n	<array>\n	<string>$(TEAMID).*</string>\n	<string>com.apple.token</string>\n	</array>\n	<key>com.apple.developer.kernel.extended-virtual-addressing</key>\n	<true/>\n	<key>com.apple.developer.kernel.increased-memory-limit</key>\n	<true/>\n</dict>\n</plist>' > entitlements.codesign.xml; \
 		rm -rf entitlements.codesign.xml; \
 	else \
 		echo 'Skipped codesigning. If not intentional, check your variables.'; \

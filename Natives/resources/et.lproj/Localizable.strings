@@ -55,7 +55,7 @@
 "preference.title.renderer.debug.auto" = "Autom.: gl4es või ANGLE";
 "preference.title.renderer.debug.gl4es" = "gl4es 1.1.4 - väljastab OpenGL 2.1";
 "preference.title.renderer.debug.angle" = "ANGLE (1.17+) - väljastab OpenGL 3.2 (Core Profile, piiratud)";
-"preference.title.renderer.debug.zink" = "Zink (Mesa 21.0) - väljastab OpenGL 4.1";
+"preference.title.renderer.debug.zink" = "Zink (Mesa 25.0) - väljastab OpenGL 4.1";
 
 "preference.detail.renderer" = "Vaheta kasutatavat OpenGL renderdusmootorit";
 
@@ -70,3 +70,7 @@
 "preference.detail.debug_auto_correction" = "Lubab mängus teksti kirjutamisel automaatparanduse.";
 "preference.title.debug_hide_home_indicator" = "Peida koduindikaator";
 "preference.detail.debug_hide_home_indicator" = "See keelab koduindikaatori lukustamise. Koduindikaatori samal ajal peitmiseks ja lukustamiseks pead kasutama Guided Access'i.";
+
+"preference.title.renderer.release.mg" = "Mobiililiimid";
+"preference.title.renderer.debug.mg" = "MobileGlues (1.17+) – ekspordib OpenGL 4.0,";
+"preference.title.renderer.debug.mobilegl" = "MobileGL Vulkan (1.17+) – ekspordib OpenGL 4.6, EKSPERIMENTAALNE";
