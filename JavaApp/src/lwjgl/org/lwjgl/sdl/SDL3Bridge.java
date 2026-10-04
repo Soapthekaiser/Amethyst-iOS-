@@ -27,7 +27,31 @@ final class SDL3Bridge {
     }
 
     // things that went wrong, always logged
+    // the same line is only printed a few times, and there's a cap overall, so a failure that repeats every frame can't fill the log
+    private static final java.util.concurrent.ConcurrentHashMap<String, Integer> warnCounts = new java.util.concurrent.ConcurrentHashMap<String, Integer>();
+    private static final java.util.concurrent.atomic.AtomicInteger warnPrinted = new java.util.concurrent.atomic.AtomicInteger();
+    private static final int WARN_REPEATS = 3;
+    private static final int WARN_CAP = 200;
+
     static void warn(String line) {
+        Integer prev = warnCounts.putIfAbsent(line, 1);
+        if (prev != null) {
+            int n = prev + 1;
+            warnCounts.put(line, n);
+            if (n == WARN_REPEATS + 1) {
+                raw("[SDL3 WARN] (that line keeps coming, hiding the rest of the copies)");
+            }
+            if (n > WARN_REPEATS) {
+                return;
+            }
+        }
+        int printed = warnPrinted.incrementAndGet();
+        if (printed > WARN_CAP) {
+            if (printed == WARN_CAP + 1) {
+                raw("[SDL3 WARN] too many warnings, not printing any more");
+            }
+            return;
+        }
         raw("[SDL3 WARN] " + line);
     }
 

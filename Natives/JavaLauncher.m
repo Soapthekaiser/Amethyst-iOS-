@@ -66,6 +66,8 @@ void init_loadDefaultEnv() {
     setenv("MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS", "1", 0);
     setenv("MVK_CONFIG_VK_SEMAPHORE_SUPPORT_STYLE", "1", 0);
     setenv("MVK_CONFIG_RESUME_LOST_DEVICE", "1", 0);
+    // errors only, the default info level dumps ~160 lines of extensions on every instance (the verbose graphics pref below raises it)
+    setenv("MVK_CONFIG_LOG_LEVEL", "1", 0);
 
     // Runs JVM in a separate thread
     setenv("HACK_IGNORE_START_ON_FIRST_THREAD", "1", 1);

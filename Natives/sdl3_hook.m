@@ -12,6 +12,17 @@
 #import "SurfaceViewController.h"
 #import "utils.h"
 
+// the [SDL3 TRACE] / [SDL3 EMBED] chatter is off by default, AMETHYST_SDL_TRACE=1 in the custom env vars brings it back
+static BOOL AMTraceOn(void) {
+    static int on = -1;
+    if (on < 0) {
+        const char *v = getenv("AMETHYST_SDL_TRACE");
+        on = (v != NULL && *v != '\0' && *v != '0') ? 1 : 0;
+    }
+    return on == 1;
+}
+#define AMTrace(...) do { if (AMTraceOn()) NSLog(__VA_ARGS__); } while (0)
+
 static UIWindow *gSDLWindow = nil;
 static UIView *gSDLView = nil;
 static BOOL gSDLInstalled = NO;
@@ -133,7 +144,7 @@ static void AMApplyPixelFilter(UIView *view) {
 
 static void AMLogSDLViewGeometry(const char *when) {
     UIView *view = gSDLView;
-    if (view == nil) return;
+    if (view == nil || !AMTraceOn()) return;
 
     CGSize drawable = CGSizeZero;
     @try {
@@ -160,28 +171,28 @@ static void AMEmbedSDLViewOnMain(void) {
     UIWindow *window = AMFindSDLWindow();
 
     if (window == nil) {
-        NSLog(@"[SDL3 EMBED] SDL UIWindow not found yet");
+        AMTrace(@"[SDL3 EMBED] SDL UIWindow not found yet");
         return;
     }
 
     UIView *sdlView = AMFindSDLView(window.rootViewController.view);
 
     if (sdlView == nil) {
-        NSLog(@"[SDL3 EMBED] SDL UIKit view not found yet");
+        AMTrace(@"[SDL3 EMBED] SDL UIKit view not found yet");
         return;
     }
 
     gSDLWindow = window;
     gSDLView = sdlView;
 
-    NSLog(@"[SDL3 EMBED] Found SDL window=%p class=%@ key=%d hidden=%d interaction=%d",
+    AMTrace(@"[SDL3 EMBED] Found SDL window=%p class=%@ key=%d hidden=%d interaction=%d",
           window,
           NSStringFromClass(window.class),
           window.isKeyWindow,
           window.hidden,
           window.userInteractionEnabled);
 
-    NSLog(@"[SDL3 EMBED] SDL view=%p class=%@ superview=%@ interaction=%d",
+    AMTrace(@"[SDL3 EMBED] SDL view=%p class=%@ superview=%@ interaction=%d",
           sdlView,
           NSStringFromClass(sdlView.class),
           NSStringFromClass(sdlView.superview.class),
@@ -196,7 +207,7 @@ static void AMEmbedSDLViewOnMain(void) {
         AMApplyPixelFilter(sdlView);
         gSDLInstalled = YES;
 
-        NSLog(@"[SDL3 EMBED] SDL view already embedded");
+        AMTrace(@"[SDL3 EMBED] SDL view already embedded");
         return;
     }
 
@@ -273,7 +284,7 @@ static void AMUIKitWindowDidBecomeVisible(NSNotification *note) {
         if (sdlView == nil)
             return;
 
-        NSLog(@"[SDL3 EMBED] SDL window became visible: %p", window);
+        AMTrace(@"[SDL3 EMBED] SDL window became visible: %p", window);
 
         /*
          * Delay one main-runloop turn because SDL may still be replacing its
@@ -296,7 +307,7 @@ static void AMUIKitWindowDidBecomeKey(NSNotification *note) {
     if (sdlView == nil)
         return;
 
-    NSLog(@"[SDL3 EMBED] SDL window became key: %p", window);
+    AMTrace(@"[SDL3 EMBED] SDL window became key: %p", window);
 
     dispatch_async(dispatch_get_main_queue(), ^{
         AMEmbedSDLViewOnMain();
@@ -348,7 +359,7 @@ static void AMInstallUIKitObservers(void) {
         sAppBackground = false;
     }];
 
-    NSLog(@"[SDL3 EMBED] UIKit window observers installed");
+    AMTrace(@"[SDL3 EMBED] UIKit window observers installed");
 }
 
 /*
@@ -373,7 +384,7 @@ static void AMSDL3SetMainReady(void) {
 
             if (setMainReady != NULL) {
                 setMainReady();
-                NSLog(@"[SDL3] SDL_SetMainReady called");
+                AMTrace(@"[SDL3] SDL_SetMainReady called");
                 dlclose(handle);
                 return;
             }
@@ -390,7 +401,7 @@ static void AMSDL3SetMainReady(void) {
 
             if (setMainReady != NULL) {
                 setMainReady();
-                NSLog(@"[SDL3] SDL_SetMainReady called");
+                AMTrace(@"[SDL3] SDL_SetMainReady called");
             }
 
             dlclose(handle);
@@ -409,7 +420,7 @@ static void AMSDL3SetMainReadyForControlify(void) {
         void (*setMainReady)(void) = (void (*)(void))dlsym(handle, "SDL_SetMainReady");
         if (setMainReady != NULL) {
             setMainReady();
-            NSLog(@"[SDL3] SDL_SetMainReady called for the Controlify SDL copy");
+            AMTrace(@"[SDL3] SDL_SetMainReady called for the Controlify SDL copy");
         } else {
             NSLog(@"[SDL3] SDL_SetMainReady missing in the Controlify SDL copy");
         }
@@ -417,7 +428,7 @@ static void AMSDL3SetMainReadyForControlify(void) {
 }
 
 void AmethystSDL3Prepare(void) {
-    NSLog(@"[SDL3 TRACE] nativePrepare BEGIN main=%d",
+    AMTrace(@"[SDL3 TRACE] nativePrepare BEGIN main=%d",
           [NSThread isMainThread]);
 
     AMInstallUIKitObservers();
@@ -445,7 +456,7 @@ void AmethystSDL3Prepare(void) {
 
     if ([[NSFileManager defaultManager] fileExistsAtPath:moltenVK]) {
         setenv("SDL_VULKAN_LIBRARY", moltenVK.UTF8String, 1);
-        NSLog(@"[SDL3] SDL_VULKAN_LIBRARY=%@", moltenVK);
+        AMTrace(@"[SDL3] SDL_VULKAN_LIBRARY=%@", moltenVK);
     } else {
         NSLog(@"[SDL3] libMoltenVK.dylib not found");
     }
@@ -458,11 +469,11 @@ void AmethystSDL3Prepare(void) {
         AMEmbedSDLViewOnMain();
     });
 
-    NSLog(@"[SDL3 TRACE] nativePrepare END");
+    AMTrace(@"[SDL3 TRACE] nativePrepare END");
 }
 
 void AmethystSDL3Loaded(void) {
-    NSLog(@"[SDL3 TRACE] nativeLoaded main=%d",
+    AMTrace(@"[SDL3 TRACE] nativeLoaded main=%d",
           [NSThread isMainThread]);
 
     /*
@@ -651,7 +662,7 @@ Java_org_lwjgl_glfw_CallbackBridge_nativeSetGrabbing(JNIEnv *env, jclass clazz,
 
 JNIEXPORT void JNICALL
 Java_org_lwjgl_sdl_SDL3Bridge_nativeSetGrabbing(JNIEnv *env, jclass clazz, jboolean grabbing) {
-    NSLog(@"[SDL3 TRACE] setGrabbing %d", (int)grabbing);
+    AMTrace(@"[SDL3 TRACE] setGrabbing %d", (int)grabbing);
     Java_org_lwjgl_glfw_CallbackBridge_nativeSetGrabbing(env, clazz, grabbing, 0.0f, 0.0f);
 }
 
@@ -662,7 +673,7 @@ Java_org_lwjgl_sdl_SDL3Bridge_nativeSetControllerPassthrough(JNIEnv *env, jclass
     (void)env;
     (void)clazz;
     AMControllerPassthrough = passthrough;
-    NSLog(@"[SDL3] controller passthrough %d", (int)passthrough);
+    AMTrace(@"[SDL3] controller passthrough %d", (int)passthrough);
 }
 
 JNIEXPORT jlong JNICALL

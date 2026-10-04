@@ -16,8 +16,12 @@ Java_org_lwjgl_sdl_SDL3GLContext_nativeSetDrawableSize(JNIEnv *env, jclass clazz
 
     void (^apply)(void) = ^{
         if (!CGSizeEqualToSize(layer.drawableSize, want)) {
-            NSLog(@"[SDL3 EMBED] gl layer drawableSize %.0fx%.0f -> %dx%d",
-                  layer.drawableSize.width, layer.drawableSize.height, (int)width, (int)height);
+            // SDL puts the size back on every re-layout, so this can come around a lot
+            static int logged = 0;
+            if (logged++ < 4) {
+                NSLog(@"[SDL3 EMBED] gl layer drawableSize %.0fx%.0f -> %dx%d",
+                      layer.drawableSize.width, layer.drawableSize.height, (int)width, (int)height);
+            }
             layer.drawableSize = want;
         }
     };
