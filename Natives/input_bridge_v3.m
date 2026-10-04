@@ -24,6 +24,7 @@
 #include "utils.h"
 
 #include "JavaLauncher.h"
+#include "sdl3_hook.h"
 
 jint (*orig_ProcessImpl_forkAndExec)(JNIEnv *env, jobject process, jint mode, jbyteArray helperpath, jbyteArray prog, jbyteArray argBlock, jint argc, jbyteArray envBlock, jint envc, jbyteArray dir, jintArray std_fds, jboolean redirectErrorStream);
 jlong (*orig_ProcessHandleImpl_isAlive0)(JNIEnv *env, jclass clazz, jlong jpid);
@@ -543,6 +544,10 @@ void CallbackBridge_nativeSetInputReady(BOOL inputReady) {
 }
 
 BOOL CallbackBridge_nativeSendChar(jchar codepoint /* jint codepoint */) {
+    if (AmethystSDL3InputActive()) {
+        AmethystSDL3ForwardInput(AM_SDL_INPUT_CHAR, codepoint, 0, 0, 0, 0, 0);
+        return YES;
+    }
     if (GLFW_invoke_Char && isInputReady) {
         if (isUseStackQueueCall) {
             sendData(EVENT_TYPE_CHAR, codepoint, 0, 0, 0);
@@ -556,6 +561,10 @@ BOOL CallbackBridge_nativeSendChar(jchar codepoint /* jint codepoint */) {
 }
 
 BOOL CallbackBridge_nativeSendCharMods(jchar codepoint, int mods) {
+    if (AmethystSDL3InputActive()) {
+        AmethystSDL3ForwardInput(AM_SDL_INPUT_CHAR, codepoint, 0, 0, 0, 0, 0);
+        return YES;
+    }
     // Accept either CharMods or Char as targets — fall back to Char when necessary
     if ((GLFW_invoke_CharMods || GLFW_invoke_Char) && isInputReady) {
         if (isUseStackQueueCall) {
@@ -579,6 +588,18 @@ JNIEXPORT void JNICALL Java_org_lwjgl_glfw_CallbackBridge_nativeSendCursorEnter(
 }
 */
 void CallbackBridge_nativeSendCursorPos(char event, CGFloat x, CGFloat y) {
+    if (AmethystSDL3InputActive()) {
+        if (!isGrabbing && windowWidth > 0 && windowHeight > 0) {
+            // absolute position: send it as a 0..1 fraction of the game window, java scales it to
+            // whatever size SDL reports for its window (b=1 means normalized)
+            AmethystSDL3ForwardInput(AM_SDL_INPUT_CURSOR, event, 1, 0, 0, (float)(x / windowWidth), (float)(y / windowHeight));
+            return;
+        }
+        // grabbed (camera): send the raw pixel deltas, same units the old GLFW path gave minecraft.
+        // dividing by the screen scale made the camera ~3x slower than before
+        AmethystSDL3ForwardInput(AM_SDL_INPUT_CURSOR, event, 0, 0, 0, (float)x, (float)y);
+        return;
+    }
     if (!GLFW_invoke_CursorPos || !isInputReady) return;
 
     switch (event) {
@@ -642,6 +663,10 @@ char getKeyModifiers(int key, int action) {
 }
 
 void CallbackBridge_nativeSendKey(int key, int scancode, int action, int mods) {
+    if (AmethystSDL3InputActive()) {
+        // no return: the ctrl -> super duplication below still applies
+        AmethystSDL3ForwardInput(AM_SDL_INPUT_KEY, key, scancode, action, mods != 0 ? mods : getKeyModifiers(key, action), 0, 0);
+    }
     if (GLFW_invoke_Key && isInputReady) {
         if (keyDownBuffer == NULL) ensureGLFWBridge();
         if (keyDownBuffer != NULL) keyDownBuffer[MAX(0, key-31)]=(jbyte)action;
@@ -665,6 +690,10 @@ void CallbackBridge_nativeSendKey(int key, int scancode, int action, int mods) {
 }
 
 void CallbackBridge_nativeSendMouseButton(int button, int action, int mods) {
+    if (AmethystSDL3InputActive()) {
+        AmethystSDL3ForwardInput(AM_SDL_INPUT_BUTTON, button, action, 0, 0, 0, 0);
+        return;
+    }
     if (isInputReady) {
         if (button == -1) {
         } else if (GLFW_invoke_MouseButton) {
@@ -684,6 +713,9 @@ void CallbackBridge_nativeSendMouseButton(int button, int action, int mods) {
 void CallbackBridge_nativeSendScreenSize(int width, int height) {
     windowWidth = width;
     windowHeight = height;
+
+    // SDL path: lets java pick up a resolution change made while the game is running
+    AmethystSDL3ForwardInput(AM_SDL_INPUT_SCREEN, width, height, 0, 0, 0, 0);
     
     if (isInputReady) {
         if (GLFW_invoke_FramebufferSize) {
@@ -706,6 +738,10 @@ void CallbackBridge_nativeSendScreenSize(int width, int height) {
 }
 
 void CallbackBridge_nativeSendScroll(CGFloat xoffset, CGFloat yoffset) {
+    if (AmethystSDL3InputActive()) {
+        AmethystSDL3ForwardInput(AM_SDL_INPUT_SCROLL, 0, 0, 0, 0, (float)xoffset, (float)yoffset);
+        return;
+    }
     if (GLFW_invoke_Scroll && isInputReady) {
         if (isUseStackQueueCall) {
             sendDataFloat(EVENT_TYPE_SCROLL, xoffset, yoffset, 0, 0);

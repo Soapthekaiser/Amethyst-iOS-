@@ -250,7 +250,7 @@ help:
 	echo '    make dsym                           Generate debug symbol files'
 	echo '    make clean                          Cleans build directories'
 	echo '    make check                          Dump all variables for checking'
-
+	
 check:
 	$(foreach v, \
 		$(shell echo "$(filter-out METHOD_% .% MAKEFILE_LIST MAKEFLAGS CURDIR,$(.VARIABLES))" | tr ' ' '\n' | sort), \
@@ -276,13 +276,16 @@ native: dep_mg
 		..
 
 	cmake --build $(WORKINGDIR) --config $(CMAKE_BUILD_TYPE) -j$(JOBS)
-	#	--target awt_headless awt_xawt libOSMesaOverride.dylib tinygl4angle AngelAuraAmethyst
 	rm $(WORKINGDIR)/libawt_headless.dylib
 	echo '[Amethyst v$(VERSION)] native - end'
 
 java:
 	echo '[Amethyst v$(VERSION)] java - start'
-	$(MAKE) -C JavaApp -j$(JOBS) BOOTJDK=$(BOOTJDK)
+	$(MAKE) -C JavaApp -j$(JOBS) BOOTJDK=$(BOOTJDK) || { \
+		echo 'Parallel Java build failed, retrying single threaded'; \
+		rm -rf JavaApp/build; \
+		$(MAKE) -C JavaApp -j1 BOOTJDK=$(BOOTJDK); \
+	}
 	echo '[Amethyst v$(VERSION)] java - end'
 
 jre: native
@@ -334,12 +337,7 @@ dep_mobilegl:
 	if [ -d "$(MOBILEGL_SOURCE_DIR)/3rdparty/glslang" ]; then \
 		cd $(MOBILEGL_SOURCE_DIR)/3rdparty/glslang && python3 update_glslang_sources.py; \
 	fi
-	mkdir -p $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Compat
-	cp $(SOURCEDIR)/Natives/libcxx_hash_shim.cpp $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Compat/libcxx_hash_shim.cpp
-	python3 $(SOURCEDIR)/Natives/patch_mobilegl_ios_visibility.py $(MOBILEGL_SOURCE_DIR)
-	python3 $(SOURCEDIR)/Natives/patch_mobilegl_ios_resolution.py $(MOBILEGL_SOURCE_DIR)
-	python3 $(SOURCEDIR)/Natives/patch_mobilegl_hash_shim.py $(MOBILEGL_SOURCE_DIR)
-	python3 $(SOURCEDIR)/Natives/patch_mobilegl_enable_availability.py $(MOBILEGL_SOURCE_DIR)
+	python3 $(SOURCEDIR)/Natives/patch_mobilegl.py $(MOBILEGL_SOURCE_DIR)
 	mkdir -p $(WORKINGDIR)/mobilegl
 	cd $(WORKINGDIR)/mobilegl && cmake \
 		-DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) \
@@ -359,7 +357,7 @@ dep_mobilegl:
 		-DMOBILEGL_VULKAN_LIBRARY="$(MOLTENVK_LIBRARY)" \
 		$(MOBILEGL_SOURCE_DIR)
 
-	cmake --build $(WORKINGDIR)/mobilegl --config $(CMAKE_BUILD_TYPE) -j$(JOBS) --target MobileGL
+	cmake --build $(WORKINGDIR)/mobilegl --config $(CMAKE_BUILD_TYPE) -j$(JOBS) --target MobileGL -- -k
 	install_name_tool -change @rpath/MoltenVK.framework/MoltenVK @rpath/libMoltenVK.dylib $(WORKINGDIR)/mobilegl/libMobileGL.dylib
 	if otool -l $(WORKINGDIR)/mobilegl/libMobileGL.dylib | grep -q 'path $(SOURCEDIR)/Natives/resources/Frameworks '; then \
 		install_name_tool -delete_rpath $(SOURCEDIR)/Natives/resources/Frameworks $(WORKINGDIR)/mobilegl/libMobileGL.dylib; \
@@ -397,6 +395,9 @@ payload: native dep_mg dep_mobilegl java jre assets
 		for f in $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/lwjgl33/*.dylib; do \
 			install_name_tool -id "@rpath/lwjgl33/$$(basename "$$f")" "$$f" || exit 1; \
 		done; \
+	fi
+	if [ -f $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/lwjgl34/libSDL3.dylib ]; then \
+		cp $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/lwjgl34/libSDL3.dylib $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/lwjgl34/libSDL3_controlify.dylib || exit 1; \
 	fi
 	if [ -d $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/lwjgl34 ]; then \
 		for f in $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/lwjgl34/*.dylib; do \
@@ -463,7 +464,7 @@ deploy:
 			else \
 				open $(OUTPUTDIR)/net.kdt.pojavlauncher.slimmed-$(VERSION)-$(PLATFORM_NAME).ipa; \
 			fi; \
-		fi; \
+		fi \
 	else \
 		echo 'Device not supported for deploy recipe.'; \
 	fi
@@ -502,7 +503,5 @@ clean:
 	rm -rf JavaApp/build
 	rm -rf $(OUTPUTDIR)
 	echo '[Amethyst v$(VERSION)] clean - end'
-
-		
 
 .PHONY: all clean check native java jre package dsym deploy help

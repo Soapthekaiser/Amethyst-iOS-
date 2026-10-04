@@ -163,15 +163,36 @@ static void AMParseVersion(NSString *versionString, int *major, int *minor, int 
 static NSString *AMBundledFolderForRequiredVersion(NSString *requiredVersion) {
     int reqMajor, reqMinor, reqPatch;
     AMParseVersion(requiredVersion, &reqMajor, &reqMinor, &reqPatch, NULL);
+
     if (reqMajor < 3) return nil;
-    for (NSArray<NSString *> *entry in AMBundledLWJGLTable()) {
+
+    NSArray<NSArray<NSString *> *> *table = AMBundledLWJGLTable();
+
+    // First try to find the first bundled LWJGL version that satisfies
+    // the requested version.
+    for (NSArray<NSString *> *entry in table) {
         int bMajor, bMinor, bPatch;
         AMParseVersion(entry[0], &bMajor, &bMinor, &bPatch, NULL);
+
         BOOL meets = (bMajor > reqMajor) ||
                      (bMajor == reqMajor && bMinor > reqMinor) ||
                      (bMajor == reqMajor && bMinor == reqMinor && bPatch >= reqPatch);
-        if (meets) return entry[1];
+
+        if (meets) {
+            return entry[1];
+        }
     }
+    
+    if (table.count > 0) {
+        NSArray<NSString *> *latest = table.lastObject;
+
+        NSLog(@"[JavaLauncher] Requested LWJGL %@ is newer than bundled versions — using newest bundled LWJGL %@",
+              requiredVersion,
+              latest[0]);
+
+        return latest[1];
+    }
+
     return nil;
 }
 
@@ -266,8 +287,14 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
                 int major;
                 BOOL isClean;
                 AMParseVersion(versionId, &major, NULL, NULL, &isClean);
-                if (isClean) {
-                    resolvedLWJGLFolder = AMBundledFolderForRequiredVersion(major >= 26 ? @"3.4.1" : @"3.3.3");
+                if (major >= 26) {
+                    // 26.3 Snapshot 4+ switched Minecraft from GLFW to SDL3.
+                    // Snapshot/pre-release IDs are not clean numeric versions, so
+                    // do not require isClean here; the major component is enough
+                    // to select the bundled LWJGL 3.4.1 SDL-capable stack.
+                    resolvedLWJGLFolder = AMBundledFolderForRequiredVersion(@"3.4.1");
+                } else if (isClean) {
+                    resolvedLWJGLFolder = AMBundledFolderForRequiredVersion(@"3.3.3");
                 }
             }
         }
@@ -390,6 +417,18 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
         NSLog(@"[JavaLauncher] No native subfolder mapped for %@ — LWJGL will fall back to the flat Frameworks/ search path", lwjglFolder);
     }
     margv[++margc] = [NSString stringWithFormat:@"-Djava.library.path=%@", javaLibraryPath].UTF8String;
+
+    // video.resolution (percent) for the SDL path, java shrinks the pixel size it reports to minecraft
+    margv[++margc] = [NSString stringWithFormat:@"-Damethyst.resolutionScale=%.3f", getPrefFloat(@"video.resolution") / 100.0].UTF8String;
+
+    margv[++margc] = "-Damethyst.noUpcalls=true";
+
+    if (lwjglNativeSubfolder) {
+        NSString *sdlDylibPath = [[frameworksPath stringByAppendingPathComponent:lwjglNativeSubfolder] stringByAppendingPathComponent:@"libSDL3_controlify.dylib"];
+        if ([fm fileExistsAtPath:sdlDylibPath]) {
+            margv[++margc] = [NSString stringWithFormat:@"-Ddev.isxander.sdl.library=%@", sdlDylibPath].UTF8String;
+        }
+    }
     margv[++margc] = [NSString stringWithFormat:@"-Dpojav.lwjglVersion=%@", lwjglFolder].UTF8String;
     margv[++margc] = [NSString stringWithFormat:@"-Duser.dir=%@", gameDir].UTF8String;
     margv[++margc] = [NSString stringWithFormat:@"-Duser.home=%s", getenv("POJAV_HOME")].UTF8String;
