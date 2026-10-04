@@ -109,7 +109,7 @@ AME_JRE8_DIR        ?= $(SOURCEDIR)/depends/java-8-openjdk
 AME_JRE17_DIR       ?= $(SOURCEDIR)/depends/java-17-openjdk
 AME_JRE21_DIR       ?= $(SOURCEDIR)/depends/java-21-openjdk
 AME_JRE25_DIR       ?= $(SOURCEDIR)/depends/java-25-openjdk
-MOBILELG_SOURCE_DIR	?= $(SOURCEDIR)/Natives/external/MobileGL
+MOBILEGL_SOURCE_DIR	?= $(SOURCEDIR)/Natives/external/MobileGL
 MOLTENVK_LIBRARY    ?= $(SOURCEDIR)/Natives/resources/Frameworks/libMoltenVK.dylib
 
 # Function to use later for checking dependencies
