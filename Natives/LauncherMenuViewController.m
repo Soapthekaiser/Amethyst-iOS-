@@ -84,26 +84,23 @@
      (id)[LauncherMenuCustomItem
           title:localize(@"login.menu.sendlogs", nil)
           imageName:@"square.and.arrow.up" action:^{
-        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-            NSArray<NSURL *> *items = [self collectDiagnosticReportItems];
-            dispatch_async(dispatch_get_main_queue(), ^{
-                UIActivityViewController *activityVC;
-                if (realUIIdiom != UIUserInterfaceIdiomTV) {
-                    activityVC = [[UIActivityViewController alloc]
-                                  initWithActivityItems:items
-                                  applicationActivities:nil];
-                } else {
-                    dlopen("/System/Library/PrivateFrameworks/SharingUI.framework/SharingUI", RTLD_GLOBAL);
-                    activityVC =
-                    [[NSClassFromString(@"SFAirDropSharingViewControllerTV") alloc]
-                     performSelector:@selector(initWithSharingItems:)
-                     withObject:items];
-                }
-                activityVC.popoverPresentationController.sourceView = titleView;
-                activityVC.popoverPresentationController.sourceRect = titleView.bounds;
-                [self presentViewController:activityVC animated:YES completion:nil];
-            });
-        });
+        NSString *latestlogPath = [NSString stringWithFormat:@"file://%s/latestlog.old.txt", getenv("AME_HOME")];
+        NSLog(@"Path is %@", latestlogPath);
+        UIActivityViewController *activityVC;
+        if (realUIIdiom != UIUserInterfaceIdiomTV) {
+            activityVC = [[UIActivityViewController alloc]
+                          initWithActivityItems:@[[NSURL URLWithString:latestlogPath]]
+                          applicationActivities:nil];
+        } else {
+            dlopen("/System/Library/PrivateFrameworks/SharingUI.framework/SharingUI", RTLD_GLOBAL);
+            activityVC =
+            [[NSClassFromString(@"SFAirDropSharingViewControllerTV") alloc]
+             performSelector:@selector(initWithSharingItems:)
+             withObject:@[[NSURL URLWithString:latestlogPath]]];
+        }
+        activityVC.popoverPresentationController.sourceView = titleView;
+        activityVC.popoverPresentationController.sourceRect = titleView.bounds;
+        [self presentViewController:activityVC animated:YES completion:nil];
     }]];
     
     NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
@@ -299,13 +296,13 @@
 
     // Reset states
     unsetenv("DEMO_LOCK");
-    setenv("POJAV_GAME_DIR", [NSString stringWithFormat:@"%s/Library/Application Support/minecraft", getenv("POJAV_HOME")].UTF8String, 1);
+    setenv("GAME_DIR", [NSString stringWithFormat:@"%s/Library/Application Support/minecraft", getenv("AME_HOME")].UTF8String, 1);
 
     id subtitle;
     if (isDemo) {
         subtitle = localize(@"login.option.demo", nil);
         setenv("DEMO_LOCK", "1", 1);
-        setenv("POJAV_GAME_DIR", [NSString stringWithFormat:@"%s/.demo", getenv("POJAV_HOME")].UTF8String, 1);
+        setenv("GAME_DIR", [NSString stringWithFormat:@"%s/.demo", getenv("AME_HOME")].UTF8String, 1);
     } else if (selected[@"xboxGamertag"] == nil) {
         subtitle = localize(@"login.option.local", nil);
     } else {

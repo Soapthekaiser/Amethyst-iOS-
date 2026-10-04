@@ -234,7 +234,7 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
                     return 1;
                 }
             }
-            [NSFileManager.defaultManager copyItemAtPath:inBundleScriptPath toPath:[NSString stringWithFormat:@"%s/UniversalJIT26.js", getenv("POJAV_HOME")] error:nil];
+            [NSFileManager.defaultManager copyItemAtPath:inBundleScriptPath toPath:[NSString stringWithFormat:@"%s/UniversalJIT26.js", getenv("AME_HOME")] error:nil];
             showDialog(localize(@"Error", nil), @"Support for legacy script has been removed. Please switch to Universal JIT script. To import it, long-press on Amethyst when enabling JIT in StikDebug and tap \"Assign Script\", then go to Amethyst's Documents directory and pick it. (on sideloaded StikDebug, the builtin script is named Amethyst-MeloNX.js)");
             [PLLogOutputView handleExitCode:1];
             return 1;
@@ -290,10 +290,7 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
                 BOOL isClean;
                 AMParseVersion(versionId, &major, NULL, NULL, &isClean);
                 if (major >= 26) {
-                    // 26.3 Snapshot 4+ switched Minecraft from GLFW to SDL3.
-                    // Snapshot/pre-release IDs are not clean numeric versions, so
-                    // do not require isClean here; the major component is enough
-                    // to select the bundled LWJGL 3.4.1 SDL-capable stack.
+
                     resolvedLWJGLFolder = AMBundledFolderForRequiredVersion(@"3.4.1");
                 } else if (isClean) {
                     resolvedLWJGLFolder = AMBundledFolderForRequiredVersion(@"3.3.3");
@@ -307,10 +304,10 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
         }
         NSLog(@"[JavaLauncher] Using LWJGL from %@", lwjglFolder);
 
-        // Setup POJAV_RENDERER
+        // Setup AME_RENDERER
         NSString *renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
         NSLog(@"[JavaLauncher] RENDERER is set to %@\n", renderer);
-        setenv("POJAV_RENDERER", renderer.UTF8String, 1);
+        setenv("AME_RENDERER", renderer.UTF8String, 1);
 
        
         NSUInteger consecutiveRendererFailures = [RendererCrashTracker consecutiveFailuresForRenderer:renderer];
@@ -344,12 +341,12 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
 
         // Setup gameDir
         gameDir = [NSString stringWithFormat:@"%s/instances/%@/%@",
-            getenv("POJAV_HOME"), getPrefObject(@"general.game_directory"),
+            getenv("AME_HOME"), getPrefObject(@"general.game_directory"),
             [PLProfiles resolveKeyForCurrentProfile:@"gameDir"]]
             .stringByStandardizingPath;
     } else {
         defaultJRETag = @"execute_jar";
-        gameDir = @(getenv("POJAV_GAME_DIR"));
+        gameDir = @(getenv("GAME_DIR"));
         launchJar = YES;
     }
     NSLog(@"[JavaLauncher] Looking for Java %d or later", minVersion);
@@ -361,7 +358,7 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
         showDialog(localize(@"Error", nil), [NSString stringWithFormat:localize(@"java.error.missing_runtime", nil),
             isExecuteJar ? [launchTarget lastPathComponent] : PLProfiles.current.selectedProfile[@"lastVersionId"], minVersion]);
         return 1;
-    } else if ([javaHome hasPrefix:@(getenv("POJAV_HOME"))]) {
+    } else if ([javaHome hasPrefix:@(getenv("AME_HOME"))]) {
         // Copy libawt_xawt.dylib
         NSString *dest = [NSString stringWithFormat:@"%@/lib/libawt_xawt.dylib", javaHome];
         NSString *source = [NSString stringWithFormat:@"%@/Frameworks/libawt_xawt.dylib", NSBundle.mainBundle.bundlePath];
@@ -433,7 +430,7 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
     }
     margv[++margc] = [NSString stringWithFormat:@"-Dpojav.lwjglVersion=%@", lwjglFolder].UTF8String;
     margv[++margc] = [NSString stringWithFormat:@"-Duser.dir=%@", gameDir].UTF8String;
-    margv[++margc] = [NSString stringWithFormat:@"-Duser.home=%s", getenv("POJAV_HOME")].UTF8String;
+    margv[++margc] = [NSString stringWithFormat:@"-Duser.home=%s", getenv("AME_HOME")].UTF8String;
     margv[++margc] = [NSString stringWithFormat:@"-Duser.timezone=%@", NSTimeZone.localTimeZone.name].UTF8String;
     margv[++margc] = [NSString stringWithFormat:@"-DUIScreen.maximumFramesPerSecond=%d", (int)UIScreen.mainScreen.maximumFramesPerSecond].UTF8String;
     margv[++margc] = "-Dorg.lwjgl.glfw.checkThread0=false";
@@ -442,7 +439,7 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
     margv[++margc] = "-Dlog4j2.formatMsgNoLookups=true";
 
     // Preset OpenGL libname
-    const char *glLibName = getenv("POJAV_RENDERER");
+    const char *glLibName = getenv("RENDERER");
     if (glLibName) {
         if (!strcmp(glLibName, "auto")) {
             // workaround only applies to 1.20.2+
