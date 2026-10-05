@@ -90,7 +90,9 @@ final class SDL3GLContext {
         }
         try {
             String lib = System.getProperty("org.lwjgl.opengl.libname");
-            return lib != null && lib.toLowerCase().contains("mobilegl");
+            if (lib == null) return false;
+            String l = lib.toLowerCase();
+            return l.contains("mobilegl") && !l.contains("mobileglues");
         } catch (Throwable t) {
             return false;
         }

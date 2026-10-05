@@ -16,6 +16,15 @@ static BOOL gl_is_mobilegl_renderer() {
     return isMobileGLRenderer(getenv("AME_RENDERER"));
 }
 
+// newer MobileGlues ships its own EGL layer (desktop GL contexts on top of its ES backend), so it
+// gets used as the EGL library like MobileGL. AME_MG_EGL=0 goes back to plain ANGLE + ES context
+static BOOL gl_use_mobileglues_egl() {
+    const char *renderer = getenv("AME_RENDERER");
+    if (!renderer || strcmp(renderer, RENDERER_NAME_MOBILEGLUES)) return NO;
+    const char *opt = getenv("AME_MG_EGL");
+    return !(opt && !strcmp(opt, "0"));
+}
+
 static void* load_egl_symbol(void *dl_handle, const char *symbol) {
     dlerror();
     void *addr = dlsym(dl_handle, symbol);
@@ -28,7 +37,8 @@ static void* load_egl_symbol(void *dl_handle, const char *symbol) {
 
 static bool dlsym_EGL() {
     const char *renderer = getenv("AME_RENDERER");
-    const char *eglLibrary = gl_is_mobilegl_renderer() ? renderer : RENDERER_NAME_MTL_ANGLE;
+    BOOL ownEgl = gl_is_mobilegl_renderer() || gl_use_mobileglues_egl();
+    const char *eglLibrary = ownEgl ? renderer : RENDERER_NAME_MTL_ANGLE;
     NSString *eglPath = [NSString stringWithFormat:@"@rpath/%s", eglLibrary ?: ""];
     void* dl_handle = dlopen(eglPath.UTF8String, RTLD_NOW | RTLD_GLOBAL);
     if (!dl_handle) {
@@ -78,6 +88,8 @@ static bool gl_init() {
         NSDebugLog(@"EGLBridge: Error eglInitialize() failed: 0x%x", handle.eglGetError());
         return false;
     }
+    NSLog(@"EGLBridge: display up (renderer %s, own egl: %d)", getenv("AME_RENDERER") ?: "<unset>",
+        gl_is_mobilegl_renderer() || gl_use_mobileglues_egl());
     return true;
 }
 
@@ -87,6 +99,8 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
     NSString *renderer = NSProcessInfo.processInfo.environment[@"AME_RENDERER"];
     BOOL angleDesktopGL = [renderer isEqualToString:@ RENDERER_NAME_MTL_ANGLE];
     BOOL mobileGL = gl_is_mobilegl_renderer();
+    BOOL mgEgl = gl_use_mobileglues_egl();
+    BOOL desktopGL = angleDesktopGL || mobileGL || mgEgl;
 
     const EGLint attribs[] = {
         EGL_RED_SIZE, 8,
@@ -95,7 +109,7 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         EGL_ALPHA_SIZE, 8,
         EGL_DEPTH_SIZE, 24,
         EGL_SURFACE_TYPE, EGL_WINDOW_BIT|EGL_PBUFFER_BIT,
-        EGL_RENDERABLE_TYPE, (angleDesktopGL || mobileGL) ? EGL_OPENGL_BIT : EGL_OPENGL_ES3_BIT,
+        EGL_RENDERABLE_TYPE, desktopGL ? EGL_OPENGL_BIT : EGL_OPENGL_ES3_BIT,
         EGL_NONE
     };
 
@@ -116,7 +130,7 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
     }
 
     EGLBoolean bindResult;
-    if (angleDesktopGL || mobileGL) {
+    if (desktopGL) {
         NSDebugLog(@"EGLBridge: Binding to desktop OpenGL");
         bindResult = handle.eglBindAPI(EGL_OPENGL_API);
     } else {
@@ -150,6 +164,13 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         EGL_CONTEXT_CLIENT_VERSION, 3,
         EGL_NONE
     };
+    // MobileGlues turns down anything above its configured version (4.0 by default), 4.6 is MobileGL only
+    const EGLint mg_ctx_attribs[] = {
+        EGL_CONTEXT_MAJOR_VERSION, 4,
+        EGL_CONTEXT_MINOR_VERSION, 0,
+        EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
+        EGL_NONE
+    };
     const EGLint desktop_ctx_attribs[] = {
         EGL_CONTEXT_MAJOR_VERSION, 4,
         EGL_CONTEXT_MINOR_VERSION, 6,
@@ -157,12 +178,14 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         EGL_NONE
     };
     bundle->context = handle.eglCreateContext(g_EglDisplay, bundle->config, share ? share->context : EGL_NO_CONTEXT,
-        mobileGL ? desktop_ctx_attribs : gles_ctx_attribs);
+        mgEgl ? mg_ctx_attribs : (mobileGL ? desktop_ctx_attribs : gles_ctx_attribs));
     if (!bundle->context) {
         NSDebugLog(@"EGLBridge: Error eglCreateContext finished with error: 0x%x", handle.eglGetError());
         free(bundle);
         return NULL;
     }
+    NSLog(@"EGLBridge: context %p surface %p (%.0fx%.0f, layer %@)", bundle->context, bundle->surface,
+        drawableSize.width, drawableSize.height, NSStringFromClass(layer.class));
     //NSDebugLog(@"EGLBridge: Created CTX pointer = %p (source = %p)", bundle->context, share?share->context:0);
 
     return bundle;
@@ -178,6 +201,11 @@ void gl_make_current(gl_render_window_t* bundle) {
 
     if(handle.eglMakeCurrent(g_EglDisplay, bundle->surface, bundle->surface, bundle->context)) {
         currentBundle = (basic_render_window_t *)bundle;
+        static BOOL loggedCurrent;
+        if (!loggedCurrent) {
+            loggedCurrent = YES;
+            NSLog(@"EGLBridge: context is current");
+        }
     } else {
         NSLog(@"EGLBridge: eglMakeCurrent returned with error: 0x%x", handle.eglGetError());
     }
@@ -188,10 +216,11 @@ void gl_swap_buffers() {
     // is active again so eglSwapBuffers (which can trigger Metal command buffer
     // submission) is never called from the background.
     pojavWaitForAppForeground();
-    if (!handle.eglSwapBuffers(g_EglDisplay, currentBundle->gl.surface) && handle.eglGetError() == EGL_BAD_SURFACE) {
-        NSLog(@"eglSwapBuffers error 0x%x", handle.eglGetError());
-        //stopSwapBuffers = true;
-        //closeGLFWWindow();
+    static int swaps, swapErrors;
+    if (++swaps == 1) NSLog(@"EGLBridge: first swap");
+    if (!handle.eglSwapBuffers(g_EglDisplay, currentBundle->gl.surface)) {
+        EGLint err = handle.eglGetError();
+        if (swapErrors++ < 5) NSLog(@"EGLBridge: eglSwapBuffers failed 0x%x", err);
     }
 }
 
