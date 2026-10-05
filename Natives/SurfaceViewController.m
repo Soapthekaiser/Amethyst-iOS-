@@ -116,7 +116,7 @@ static GameSurfaceView* pojavWindow;
     [self performSelector:@selector(initCategory_Navigation)];
     
     self.surfaceView = [[GameSurfaceView alloc] initWithFrame:self.view.frame];
-    self.surfaceView.layer.contentsScale = screenScale;
+    self.surfaceView.layer.contentsScale = screenScale * resolutionScale;
     self.surfaceView.layer.magnificationFilter = self.surfaceView.layer.minificationFilter = kCAFilterNearest;
     self.surfaceView.multipleTouchEnabled = YES;
     pojavWindow = self.surfaceView;
@@ -374,7 +374,7 @@ static GameSurfaceView* pojavWindow;
     }
 
     resolutionScale = getPrefFloat(@"video.resolution") / 100.0;
-    self.surfaceView.layer.contentsScale = self.screenScale;
+    self.surfaceView.layer.contentsScale = self.screenScale * resolutionScale;
 
     physicalWidth = roundf(self.surfaceView.frame.size.width * self.screenScale);
     physicalHeight = roundf(self.surfaceView.frame.size.height * self.screenScale);
@@ -394,6 +394,7 @@ static GameSurfaceView* pojavWindow;
     if ([self.surfaceView.layer isKindOfClass:CAMetalLayer.class]) {
         ((CAMetalLayer *)self.surfaceView.layer).drawableSize =
             CGSizeMake(MAX(windowWidth, 1), MAX(windowHeight, 1));
+        NSLog(@"[SurfaceVC] window=%dx%d contentsScale=%.2f drawable=%@", (int)windowWidth, (int)windowHeight, self.surfaceView.layer.contentsScale, NSStringFromCGSize(((CAMetalLayer *)self.surfaceView.layer).drawableSize));
     }
 
     // Tell Minecraft/MobileGL about the internal render resolution.
