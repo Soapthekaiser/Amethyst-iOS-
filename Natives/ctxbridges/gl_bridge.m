@@ -13,7 +13,7 @@ static EGLDisplay g_EglDisplay;
 static egl_library handle;
 
 static BOOL gl_is_mobilegl_renderer() {
-    return isMobileGLRenderer(getenv("POJAV_RENDERER"));
+    return isMobileGLRenderer(getenv("AME_RENDERER"));
 }
 
 static void* load_egl_symbol(void *dl_handle, const char *symbol) {
@@ -27,7 +27,7 @@ static void* load_egl_symbol(void *dl_handle, const char *symbol) {
 }
 
 static bool dlsym_EGL() {
-    const char *renderer = getenv("POJAV_RENDERER");
+    const char *renderer = getenv("AME_RENDERER");
     const char *eglLibrary = gl_is_mobilegl_renderer() ? renderer : RENDERER_NAME_MTL_ANGLE;
     NSString *eglPath = [NSString stringWithFormat:@"@rpath/%s", eglLibrary ?: ""];
     void* dl_handle = dlopen(eglPath.UTF8String, RTLD_NOW | RTLD_GLOBAL);
@@ -84,7 +84,7 @@ static bool gl_init() {
 gl_render_window_t* gl_init_context(gl_render_window_t *share) {
     gl_render_window_t* bundle = calloc(1, sizeof(gl_render_window_t));
 
-    NSString *renderer = NSProcessInfo.processInfo.environment[@"RENDERER"];
+    NSString *renderer = NSProcessInfo.processInfo.environment[@"AME_RENDERER"];
     BOOL angleDesktopGL = [renderer isEqualToString:@ RENDERER_NAME_MTL_ANGLE];
     BOOL mobileGL = gl_is_mobilegl_renderer();
 

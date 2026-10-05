@@ -439,7 +439,7 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
     margv[++margc] = "-Dlog4j2.formatMsgNoLookups=true";
 
     // Preset OpenGL libname
-    const char *glLibName = getenv("RENDERER");
+    const char *glLibName = getenv("AME_RENDERER");
     if (glLibName) {
         if (!strcmp(glLibName, "auto")) {
             // workaround only applies to 1.20.2+
