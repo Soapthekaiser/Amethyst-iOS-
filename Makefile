@@ -312,6 +312,7 @@ jre: native
 
 dep_mg:
 	echo '[Amethyst v$(VERSION)] dep_mg - start'
+	python3 $(SOURCEDIR)/Natives/patch_mobileglues.py $(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/ || true
 	mkdir -p $(WORKINGDIR)/mobileglues
 	cd $(WORKINGDIR)/mobileglues && cmake \
 		-DMACOS="1" \
