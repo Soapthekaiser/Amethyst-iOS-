@@ -217,7 +217,9 @@ void gl_swap_buffers() {
     // submission) is never called from the background.
     pojavWaitForAppForeground();
     static int swaps, swapErrors;
-    if (++swaps == 1) NSLog(@"EGLBridge: first swap");
+    // a few markers so the log shows if frames keep coming
+    ++swaps;
+    if (swaps == 1 || swaps == 60 || swaps == 600 || swaps == 6000) NSLog(@"EGLBridge: swap #%d", swaps);
     if (!handle.eglSwapBuffers(g_EglDisplay, currentBundle->gl.surface)) {
         EGLint err = handle.eglGetError();
         if (swapErrors++ < 5) NSLog(@"EGLBridge: eglSwapBuffers failed 0x%x", err);
