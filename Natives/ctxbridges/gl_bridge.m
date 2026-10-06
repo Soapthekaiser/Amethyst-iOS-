@@ -4,6 +4,7 @@
 
 #include <dlfcn.h>
 #include <string.h>
+#include <mach/mach.h>
 #include "bridge_tbl.h"
 #include "environ.h"
 #include "gl_bridge.h"
@@ -11,6 +12,75 @@
 
 static EGLDisplay g_EglDisplay;
 static egl_library handle;
+
+// swap stall watchdog, only logs. if frames stop it prints where the render thread is sitting
+static volatile int g_swapCount;
+static volatile int g_inSwap;
+static volatile mach_port_t g_renderThread;
+
+static BOOL gl_safe_read(uintptr_t addr, void *out, size_t len) {
+    vm_size_t got = 0;
+    return vm_read_overwrite(mach_task_self(), (vm_address_t)addr, len, (vm_address_t)out, &got) == KERN_SUCCESS && got == len;
+}
+
+static void gl_log_frame(int idx, uintptr_t addr) {
+    addr &= 0x0000000FFFFFFFFFULL; // strip pointer auth bits
+    Dl_info info;
+    if (addr && dladdr((void *)addr, &info) && info.dli_fname) {
+        const char *base = strrchr(info.dli_fname, '/');
+        NSLog(@"EGLBridge:   #%d %s`%s +0x%lx", idx, base ? base + 1 : info.dli_fname,
+            info.dli_sname ?: "?", (unsigned long)(addr - (uintptr_t)(info.dli_saddr ?: info.dli_fbase)));
+    } else {
+        NSLog(@"EGLBridge:   #%d 0x%lx", idx, (unsigned long)addr);
+    }
+}
+
+static void gl_dump_render_thread(void) {
+    mach_port_t thread = g_renderThread;
+    if (!thread) return;
+    if (thread_suspend(thread) != KERN_SUCCESS) return;
+    arm_thread_state64_t st;
+    mach_msg_type_number_t cnt = ARM_THREAD_STATE64_COUNT;
+    if (thread_get_state(thread, ARM_THREAD_STATE64, (thread_state_t)&st, &cnt) == KERN_SUCCESS) {
+        uintptr_t pc = (uintptr_t)__darwin_arm_thread_state64_get_pc(st);
+        uintptr_t lr = (uintptr_t)__darwin_arm_thread_state64_get_lr(st);
+        uintptr_t fp = (uintptr_t)__darwin_arm_thread_state64_get_fp(st);
+        gl_log_frame(0, pc);
+        gl_log_frame(1, lr);
+        for (int i = 2; i < 12 && fp; i++) {
+            uintptr_t frame[2];
+            if ((fp & 7) || !gl_safe_read(fp, frame, sizeof(frame))) break;
+            gl_log_frame(i, frame[1]);
+            if (frame[0] <= fp) break;
+            fp = frame[0];
+        }
+    }
+    thread_resume(thread);
+}
+
+static void gl_start_watchdog(void) {
+    static dispatch_source_t timer;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        dispatch_queue_t q = dispatch_queue_create("ame.gl.watchdog", DISPATCH_QUEUE_SERIAL);
+        timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
+        dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC), 5 * NSEC_PER_SEC, NSEC_PER_SEC / 10);
+        __block int last = -1, reports = 0;
+        dispatch_source_set_event_handler(timer, ^{
+            int now = g_swapCount;
+            if (now == last && now > 0) {
+                if (reports++ < 3) {
+                    NSLog(@"EGLBridge: no swap for %ds (swaps=%d, inside eglSwapBuffers=%d)", reports * 5, now, g_inSwap);
+                    gl_dump_render_thread();
+                }
+            } else {
+                reports = 0;
+            }
+            last = now;
+        });
+        dispatch_resume(timer);
+    });
+}
 
 static BOOL gl_is_mobilegl_renderer() {
     return isMobileGLRenderer(getenv("AME_RENDERER"));
@@ -219,11 +289,21 @@ void gl_swap_buffers() {
     static int swaps, swapErrors;
     // a few markers so the log shows if frames keep coming
     ++swaps;
-    if (swaps == 1 || swaps == 60 || swaps == 600 || swaps == 6000) NSLog(@"EGLBridge: swap #%d", swaps);
-    if (!handle.eglSwapBuffers(g_EglDisplay, currentBundle->gl.surface)) {
+    if (swaps == 1) {
+        g_renderThread = mach_thread_self();
+        gl_start_watchdog();
+    }
+    g_swapCount = swaps;
+    BOOL mark = swaps <= 3 || swaps == 60 || swaps == 600 || swaps == 6000;
+    if (mark) NSLog(@"EGLBridge: swap #%d", swaps);
+    g_inSwap = 1;
+    EGLBoolean swapped = handle.eglSwapBuffers(g_EglDisplay, currentBundle->gl.surface);
+    g_inSwap = 0;
+    if (!swapped) {
         EGLint err = handle.eglGetError();
         if (swapErrors++ < 5) NSLog(@"EGLBridge: eglSwapBuffers failed 0x%x", err);
     }
+    if (swaps <= 3) NSLog(@"EGLBridge: swap #%d returned", swaps);
 }
 
 void gl_swap_interval(int swapInterval) {
