@@ -13,10 +13,55 @@
 static EGLDisplay g_EglDisplay;
 static egl_library handle;
 
-// swap stall watchdog, only logs. if frames stop it prints where the render thread is sitting
 static volatile int g_swapCount;
 static volatile int g_inSwap;
 static volatile mach_port_t g_renderThread;
+
+// diagnostics for the black screen: lib the gl functions come from, set when egl is loaded
+static void *g_glLib;
+
+static void gl_diag_frame(int swaps) {
+    if (!g_glLib || swaps < 5) return;
+    typedef void (*fn_clearColor)(float, float, float, float);
+    typedef void (*fn_clear)(unsigned);
+    typedef void (*fn_scissor)(int, int, int, int);
+    typedef void (*fn_toggle)(unsigned);
+    typedef void (*fn_bindFb)(unsigned, unsigned);
+    typedef void (*fn_colorMask)(unsigned char, unsigned char, unsigned char, unsigned char);
+    typedef unsigned (*fn_getError)(void);
+    static fn_clearColor clearColor; static fn_clear clear; static fn_scissor scissor;
+    static fn_toggle enable, disable; static fn_bindFb bindFb; static fn_colorMask colorMask;
+    static fn_getError getError;
+    static BOOL resolved;
+    if (!resolved) {
+        resolved = YES;
+        clearColor = (fn_clearColor)dlsym(g_glLib, "glClearColor");
+        clear = (fn_clear)dlsym(g_glLib, "glClear");
+        scissor = (fn_scissor)dlsym(g_glLib, "glScissor");
+        enable = (fn_toggle)dlsym(g_glLib, "glEnable");
+        disable = (fn_toggle)dlsym(g_glLib, "glDisable");
+        bindFb = (fn_bindFb)dlsym(g_glLib, "glBindFramebuffer");
+        colorMask = (fn_colorMask)dlsym(g_glLib, "glColorMask");
+        getError = (fn_getError)dlsym(g_glLib, "glGetError");
+        NSLog(@"EGLBridge: diag gl functions: clear=%p scissor=%p bindFb=%p getError=%p", clear, scissor, bindFb, getError);
+    }
+    if (getError && (swaps == 5 || swaps == 60 || swaps == 300)) {
+        for (int i = 0; i < 16; i++) {
+            unsigned err = getError();
+            if (!err) break;
+            NSLog(@"EGLBridge: gl error 0x%x (swap %d)", err, swaps);
+        }
+    }
+    if (swaps >= 60 && clear && clearColor && scissor && enable && disable && bindFb && colorMask) {
+        bindFb(0x8D40, 0);          // GL_FRAMEBUFFER, the window
+        colorMask(1, 1, 1, 1);
+        enable(0x0C11);             // GL_SCISSOR_TEST
+        scissor(0, 0, 400, 400);
+        clearColor(0.f, 1.f, 0.f, 1.f);
+        clear(0x4000);              // GL_COLOR_BUFFER_BIT
+        disable(0x0C11);
+    }
+}
 
 static BOOL gl_safe_read(uintptr_t addr, void *out, size_t len) {
     vm_size_t got = 0;
@@ -117,6 +162,7 @@ static bool dlsym_EGL() {
         return false;
     }
 
+    g_glLib = dl_handle;
     memset(&handle, 0, sizeof(handle));
     handle.eglBindAPI = load_egl_symbol(dl_handle, "eglBindAPI");
     handle.eglChooseConfig = load_egl_symbol(dl_handle, "eglChooseConfig");
@@ -296,6 +342,7 @@ void gl_swap_buffers() {
     g_swapCount = swaps;
     BOOL mark = swaps <= 3 || swaps == 60 || swaps == 600 || swaps == 6000;
     if (mark) NSLog(@"EGLBridge: swap #%d", swaps);
+    gl_diag_frame(swaps);
     g_inSwap = 1;
     EGLBoolean swapped = handle.eglSwapBuffers(g_EglDisplay, currentBundle->gl.surface);
     g_inSwap = 0;
