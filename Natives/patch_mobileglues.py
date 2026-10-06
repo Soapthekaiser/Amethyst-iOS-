@@ -40,12 +40,27 @@ def patch_trace(root):
     return True
 
 
+def patch_sync(root):
+    path = root / "gl" / "gl_native.cpp"
+    text = path.read_text(encoding="utf-8")
+    if "flags | 0x00000001u" in text:
+        print("[sync] already applied")
+        return True
+    old = "NATIVE_FUNCTION_END(GLenum, glClientWaitSync, sync,flags,timeout)"
+    if text.count(old) != 1:
+        print("[sync] couldn't find glClientWaitSync, not touching gl_native.cpp", file=sys.stderr)
+        return False
+    path.write_text(text.replace(old, "NATIVE_FUNCTION_END(GLenum, glClientWaitSync, sync,flags | 0x00000001u,timeout)"), encoding="utf-8")
+    print("[sync] applied")
+    return True
+
+
 def main():
     if len(sys.argv) != 2:
         print("usage: patch_mobileglues.py <MobileGlues-cpp dir>", file=sys.stderr)
         return 2
     root = Path(sys.argv[1])
-    ok = patch_log(root) & patch_trace(root)
+    ok = patch_log(root) & patch_trace(root) & patch_sync(root)
     # not fatal for the build, it only affects logging
     return 0
 

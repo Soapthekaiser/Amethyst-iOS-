@@ -9,7 +9,7 @@ static NSString * const kFailureCountKey = @"pendingFailureCount";
 @implementation RendererCrashTracker
 
 + (nullable NSString *)healthFilePath {
-    const char *home = getenv("POJAV_HOME");
+    const char *home = getenv("AME_HOME");
     if (!home || !*home) return nil;
     return [[NSString stringWithUTF8String:home] stringByAppendingPathComponent:kHealthFileName];
 }

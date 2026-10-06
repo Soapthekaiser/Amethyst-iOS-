@@ -374,7 +374,7 @@
 
 - (NSArray<NSURL *> *)collectDiagnosticReportItems {
     NSFileManager *fm = NSFileManager.defaultManager;
-    const char *homeEnv = getenv("POJAV_HOME");
+    const char *homeEnv = getenv("AME_HOME");
     if (!homeEnv || !*homeEnv) return @[];
     NSString *home = @(homeEnv);
     NSMutableArray<NSURL *> *items = [NSMutableArray array];
@@ -416,7 +416,7 @@
     [info appendFormat:@"Commit: %s (%s)\n", CONFIG_COMMIT, CONFIG_BRANCH];
     [info appendFormat:@"Device: %@\n", [HostManager GetModelName]];
     [info appendFormat:@"OS: %@\n", UIDevice.currentDevice.completeOSVersion];
-    const char *installType = getenv("POJAV_DETECTEDINST");
+    const char *installType = getenv("AME_DETECTEDINST");
     [info appendFormat:@"Install type: %s\n", installType ? installType : "unknown"];
     [info appendFormat:@"Renderer: %@\n", [PLProfiles resolveKeyForCurrentProfile:@"renderer"]];
 
